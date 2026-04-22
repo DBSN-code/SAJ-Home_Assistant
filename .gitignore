@@ -21,6 +21,7 @@ desktop.ini
 
 # Dev files (scripts, analysis, captured data)
 dev/
+CONTEXT.md
 
 # PDF docs
 docs/*.pdf
