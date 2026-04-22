@@ -23,8 +23,8 @@ desktop.ini
 dev/
 CONTEXT.md
 
-# PDF docs
-docs/*.pdf
+# Docs (local only)
+docs/
 
 # Playwright
 playwright/
