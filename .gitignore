@@ -1,0 +1,43 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test/debug files (not part of the integration)
+test_*.py
+capture_api.py
+analyze_*.py
+extract_sign.py
+app_bundle.js
+captured_requests.json
+signature_analysis.txt
+*_output.txt
+*_result*.txt
+js_*.txt
+sign_extract.txt
+sig_*.txt
+
+# PDF docs
+*.pdf
+
+# Playwright
+playwright/
+
+# Gemini/Antigravity metadata
+.gemini/

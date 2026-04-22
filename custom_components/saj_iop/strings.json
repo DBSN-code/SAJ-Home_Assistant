@@ -1,0 +1,52 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SAJ IOP Solar — Login",
+        "description": "Enter your SAJ IOP portal credentials (iop.saj-electric.com).",
+        "data": {
+          "username": "Email",
+          "password": "Password"
+        }
+      },
+      "plant": {
+        "title": "Select Plant",
+        "description": "Select the solar plant to monitor.",
+        "data": {
+          "plant_uid": "Plant"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password.",
+      "cannot_connect": "Unable to connect to SAJ portal.",
+      "no_plants": "No solar plants found in your account.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This plant is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "power_now": { "name": "Power" },
+      "today_energy": { "name": "Energy today" },
+      "month_energy": { "name": "Energy this month" },
+      "year_energy": { "name": "Energy this year" },
+      "total_energy": { "name": "Total energy" },
+      "grid_voltage": { "name": "Grid voltage" },
+      "grid_current": { "name": "Grid current" },
+      "grid_frequency": { "name": "Grid frequency" },
+      "running_state": { "name": "Status" },
+      "today_income": { "name": "Income today" },
+      "plant_power_now": { "name": "Total power" },
+      "plant_today_energy": { "name": "Total energy today" },
+      "plant_total_energy": { "name": "Total energy produced" },
+      "plant_peak_power": { "name": "Peak power" },
+      "plant_online_devices": { "name": "Devices online" },
+      "plant_total_devices": { "name": "Total devices" },
+      "plant_today_income": { "name": "Total income today" },
+      "plant_total_income": { "name": "Total income" }
+    }
+  }
+}
