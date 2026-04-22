@@ -19,25 +19,15 @@ env/
 Thumbs.db
 desktop.ini
 
-# Test/debug files (not part of the integration)
-test_*.py
-capture_api.py
-analyze_*.py
-extract_sign.py
-app_bundle.js
-captured_requests.json
-signature_analysis.txt
-*_output.txt
-*_result*.txt
-js_*.txt
-sign_extract.txt
-sig_*.txt
+# Dev files (scripts, analysis, captured data)
+dev/
 
 # PDF docs
-*.pdf
+docs/*.pdf
 
 # Playwright
 playwright/
 
 # Gemini/Antigravity metadata
 .gemini/
+
