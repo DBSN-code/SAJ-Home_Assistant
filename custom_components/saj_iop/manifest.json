@@ -1,12 +1,12 @@
 {
   "domain": "saj_iop",
   "name": "SAJ IOP Solar",
-  "codeowners": ["@deibson"],
+  "codeowners": ["@DBSN-code"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/deibson/saj-home-assistant",
+  "documentation": "https://github.com/DBSN-code/SAJ-Home_Assistant",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/deibson/saj-home-assistant/issues",
+  "issue_tracker": "https://github.com/DBSN-code/SAJ-Home_Assistant/issues",
   "requirements": ["pycryptodome>=3.20.0"],
   "version": "0.1.0"
 }
