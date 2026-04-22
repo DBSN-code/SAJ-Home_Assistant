@@ -40,7 +40,7 @@ Deve funcionar com qualquer dispositivo registrado no portal iop.saj-electric.co
 2. Vá em **Integrações** → menu ⋮ → **Repositórios personalizados**
 3. Adicione a URL do repositório:
    ```
-   https://github.com/SEU_USUARIO/SAJ-Home_Assistant
+   https://github.com/DBSN-code/SAJ-Home_Assistant
    ```
 4. Selecione a categoria **Integração**
 5. Clique em **Adicionar**
