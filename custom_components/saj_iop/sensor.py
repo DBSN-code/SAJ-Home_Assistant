@@ -48,7 +48,7 @@ DEVICE_SENSORS: tuple[SAJDeviceSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda ld, dd, sd: sd.get("powerNow", 0),
+        value_fn=lambda ld, dd, sd: sd.get("powerNow"),
     ),
     SAJDeviceSensorDescription(
         key="today_energy",
@@ -56,7 +56,7 @@ DEVICE_SENSORS: tuple[SAJDeviceSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda ld, dd, sd: ld.get("todayEnergy", 0),
+        value_fn=lambda ld, dd, sd: ld.get("todayEnergy"),
     ),
     SAJDeviceSensorDescription(
         key="month_energy",
@@ -64,7 +64,7 @@ DEVICE_SENSORS: tuple[SAJDeviceSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda ld, dd, sd: ld.get("monthEnergy", 0),
+        value_fn=lambda ld, dd, sd: ld.get("monthEnergy"),
     ),
     SAJDeviceSensorDescription(
         key="year_energy",
@@ -72,7 +72,7 @@ DEVICE_SENSORS: tuple[SAJDeviceSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda ld, dd, sd: ld.get("yearEnergy", 0),
+        value_fn=lambda ld, dd, sd: ld.get("yearEnergy"),
     ),
     SAJDeviceSensorDescription(
         key="total_energy",
@@ -80,7 +80,7 @@ DEVICE_SENSORS: tuple[SAJDeviceSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda ld, dd, sd: ld.get("totalEnergy", 0),
+        value_fn=lambda ld, dd, sd: ld.get("totalEnergy"),
     ),
     SAJDeviceSensorDescription(
         key="grid_voltage",
@@ -135,7 +135,7 @@ PLANT_SENSORS: tuple[SAJPlantSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda o: o.get("nowPower", 0),
+        value_fn=lambda o: o.get("nowPower"),
     ),
     SAJPlantSensorDescription(
         key="plant_today_energy",
@@ -143,7 +143,7 @@ PLANT_SENSORS: tuple[SAJPlantSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda o: o.get("todayEnergy", 0),
+        value_fn=lambda o: o.get("todayEnergy"),
     ),
     SAJPlantSensorDescription(
         key="plant_total_energy",
@@ -151,7 +151,7 @@ PLANT_SENSORS: tuple[SAJPlantSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda o: o.get("totalEnergy", 0),
+        value_fn=lambda o: o.get("totalEnergy"),
     ),
     SAJPlantSensorDescription(
         key="plant_peak_power",
@@ -159,34 +159,34 @@ PLANT_SENSORS: tuple[SAJPlantSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda o: o.get("peakPower", 0),
+        value_fn=lambda o: o.get("peakPower"),
     ),
     SAJPlantSensorDescription(
         key="plant_online_devices",
         translation_key="plant_online_devices",
         icon="mdi:solar-panel",
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda o: o.get("onlineDeviceNum", 0),
+        value_fn=lambda o: o.get("onlineDeviceNum"),
     ),
     SAJPlantSensorDescription(
         key="plant_total_devices",
         translation_key="plant_total_devices",
         icon="mdi:solar-panel",
-        value_fn=lambda o: o.get("totalDeviceNum", 0),
+        value_fn=lambda o: o.get("totalDeviceNum"),
     ),
     SAJPlantSensorDescription(
         key="plant_today_income",
         translation_key="plant_today_income",
         icon="mdi:currency-brl",
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda o: o.get("todayIncome", 0),
+        value_fn=lambda o: o.get("todayIncome"),
     ),
     SAJPlantSensorDescription(
         key="plant_total_income",
         translation_key="plant_total_income",
         icon="mdi:currency-brl",
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda o: o.get("totalIncome", 0),
+        value_fn=lambda o: o.get("totalIncome"),
     ),
 )
 

@@ -54,6 +54,16 @@ class SAJDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Fetch device list with basic data
             devices = await self.api.get_device_list(self.plant_uid)
 
+            # The v2 plant endpoints split energy statistics and live power.
+            # Keep the established sensor keys and device identities.
+            overview.update({
+                "nowPower": energy_flow.get("totalPvPower"),
+                "onlineDeviceNum": sum(
+                    device.get("runningState") in (1, 2) for device in devices
+                ),
+                "totalDeviceNum": len(devices),
+            })
+
             # Fetch detailed info for each device
             device_details: dict[str, dict[str, Any]] = {}
             for device in devices:

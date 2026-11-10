@@ -2,7 +2,7 @@
 SAJ IOP API Client
 ==================
 Async Python client for the SAJ Electric IOP monitoring portal.
-Communicates directly with the REST API at iop.saj-electric.com.
+Uses v2 login/plant endpoints and the compatible v1 device endpoints.
 
 Supports:
 - Authentication (login with AES-ECB encrypted password + JWT token)
@@ -13,10 +13,13 @@ Supports:
 """
 
 import hashlib
+import hmac
+import json
 import logging
 import string
 import random
 import time
+import uuid
 from datetime import date
 from typing import Any
 
@@ -29,6 +32,11 @@ _LOGGER = logging.getLogger(__name__)
 # Constants
 DEFAULT_BASE_URL = "https://iop.saj-electric.com"
 API_PATH = "/dev-api/api/v1"
+API_V2_PATH = "/dev-api/api/v2"
+# Public portal client secret, not an account credential.
+V2_CLIENT_SECRET = "b389a704-31f1-463d-8db7-435b18d1311d"
+AUTH_EXPIRED_CODES = {401, 10002, 10004, 10007}
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
 APP_PROJECT_NAME = "elekeeper"
 CLIENT_ID = "esolar-monitor-admin"
 SIGNATURE_KEY = "ktoKRLgQPjvNyUZO8lVc9kU1Bsip6XIe"
@@ -212,6 +220,56 @@ class SAJApi:
     # API methods
     # =========================================================================
 
+    def _build_v2_request(
+        self, params: dict[str, Any], *, authenticated: bool = True
+    ) -> tuple[dict[str, str], str]:
+        """Match the portal v2 JSON body and X-Sign HMAC-SHA256 protocol.
+
+        Sign the MD5 of the exact serialized body plus sorted X-* metadata.
+        Timestamp and trace ID are appended as timestamp/nonce, not included
+        among the sorted headers. The legacy v1 signing remains for reads.
+        """
+        timestamp = str(int(time.time() * 1000))
+        client_date = date.today().isoformat()
+        headers = self._get_headers(authenticated=authenticated)
+        headers.pop("enablesign", None)
+        headers.update({
+            "Content-Type": "application/json;charset=utf-8",
+            "lang": "en",
+            "X-App-Project-Name": APP_PROJECT_NAME,
+            "X-Client-Date": client_date,
+            "X-Lang": "en",
+            "X-Timestamp": timestamp,
+            "X-Client-Code": "organization",
+            "X-Theme-Color": "light",
+            "X-Trace-Id": uuid.uuid4().hex[:16],
+        })
+        body = json.dumps({
+            **params,
+            "appProjectName": APP_PROJECT_NAME,
+            "clientDate": client_date,
+            "lang": "en",
+            "timeStamp": int(timestamp),
+            "clientId": CLIENT_ID,
+            "clientCode": "organization",
+            "themeColor": "light",
+        }, ensure_ascii=False, separators=(",", ":"))
+        sign_params = {
+            key.lower()[2:]: value
+            for key, value in headers.items()
+            if key.lower().startswith("x-")
+            and key.lower() not in {"x-timestamp", "x-trace-id"}
+        }
+        sign_params["body"] = hashlib.md5(body.encode("utf-8")).hexdigest()
+        sign_string = "&".join(f"{key}={sign_params[key]}" for key in sorted(sign_params))
+        sign_string += f"&nonce={headers['X-Trace-Id']}&timestamp={timestamp}"
+        headers["X-Sign"] = hmac.new(
+            V2_CLIENT_SECRET.encode("utf-8"),
+            sign_string.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        return headers, body
+
     async def login(self) -> dict[str, Any]:
         """
         Authenticate with the SAJ portal.
@@ -221,30 +279,26 @@ class SAJApi:
         """
         session = await self._ensure_session()
         
-        encrypted_password = self._encrypt_password(self._password)
-
-        login_params = {
-            "lang": "en",
-            "password": encrypted_password,
-            "rememberMe": "true",
+        self._token = None
+        self._token_expires_at = 0
+        headers, body = self._build_v2_request({
             "username": self._username,
-            "loginType": "1",
-        }
+            "password": self._encrypt_password(self._password),
+            "rememberMe": True,
+            "loginType": 1,
+        }, authenticated=False)
 
-        # Build signed params for login (POST: sign only common params)
-        signed_params = self._build_signed_params(login_params, is_post=True)
-
-        headers = self._get_headers(authenticated=False)
-        headers["Content-Type"] = "application/x-www-form-urlencoded;charset=UTF-8"
-
-        _LOGGER.debug("Logging in to SAJ portal as %s", self._username)
+        _LOGGER.debug("Logging in to SAJ portal")
 
         async with session.post(
-            f"{self._base_url}{API_PATH}/sys/login",
-            data=signed_params,
+            f"{self._base_url}{API_V2_PATH}/sys/user/login",
+            data=body.encode("utf-8"),
             headers=headers,
+            timeout=REQUEST_TIMEOUT,
         ) as resp:
-            result = await resp.json()
+            if resp.status in (401, 403):
+                raise SAJAuthError("SAJ login was rejected", err_code=resp.status)
+            result = await self._read_response(resp)
             err_code = result.get("errCode", -1)
 
             if err_code != 0:
@@ -253,11 +307,22 @@ class SAJApi:
                     err_code=err_code,
                 )
 
-            data = result.get("data", {})
-            self._token = data.get("token")
-            self._token_head = data.get("tokenHead", "Bearer ")
-            expires_in = data.get("expiresIn", 259199)
-            self._token_expires_at = time.time() + expires_in - 300  # 5min buffer
+            data = result.get("data")
+            if not isinstance(data, dict) or not isinstance(data.get("token"), str) or not data["token"]:
+                raise SAJAuthError("Login response did not include a valid token")
+            try:
+                expires_in = int(data["expiresIn"])
+            except (KeyError, TypeError, ValueError) as err:
+                raise SAJAuthError("Login response did not include a valid token lifetime") from err
+            if expires_in <= 0:
+                raise SAJAuthError("Login response token lifetime must be positive")
+            token_head = data.get("tokenHead") or "Bearer"
+            if not isinstance(token_head, str):
+                raise SAJAuthError("Login response did not include a valid token type")
+            self._token = data["token"]
+            self._token_head = token_head.strip() + " "
+            # Reserve at most 10% for short-lived tokens, capped at five minutes.
+            self._token_expires_at = time.time() + expires_in - min(300, expires_in * 0.1)
 
             _LOGGER.info("Successfully logged in to SAJ portal")
             return data
@@ -267,6 +332,19 @@ class SAJApi:
         if not self.is_authenticated:
             await self.login()
 
+    @staticmethod
+    async def _read_response(resp: aiohttp.ClientResponse) -> dict[str, Any]:
+        """Reject removed endpoints/invalid responses without logging secrets."""
+        if resp.status >= 400:
+            raise SAJApiError(f"SAJ returned HTTP {resp.status}", err_code=resp.status)
+        try:
+            result = await resp.json()
+        except (aiohttp.ContentTypeError, ValueError) as err:
+            raise SAJApiError("SAJ returned an invalid JSON response") from err
+        if not isinstance(result, dict):
+            raise SAJApiError("SAJ returned an unexpected response format")
+        return result
+
     async def _api_get(
         self, path: str, extra_params: dict[str, Any] | None = None
     ) -> dict[str, Any]:
@@ -274,35 +352,52 @@ class SAJApi:
         await self._ensure_authenticated()
         session = await self._ensure_session()
 
-        params = self._build_signed_params(extra_params)
-        headers = self._get_headers(authenticated=True)
-
         url = f"{self._base_url}{API_PATH}/{path}"
         _LOGGER.debug("GET %s", url)
-
-        async with session.get(url, params=params, headers=headers) as resp:
-            result = await resp.json()
+        for attempt in range(2):
+            async with session.get(
+                url, params=self._build_signed_params(extra_params),
+                headers=self._get_headers(), timeout=REQUEST_TIMEOUT,
+            ) as resp:
+                result = {"errCode": 401} if resp.status == 401 else await self._read_response(resp)
             err_code = result.get("errCode", -1)
-
-            if err_code == 401 or err_code == 10001:
-                # Token expired, re-authenticate
+            if err_code in AUTH_EXPIRED_CODES and attempt == 0:
                 _LOGGER.warning("Token expired, re-authenticating...")
                 self._token = None
                 await self.login()
-                # Retry the request
-                params = self._build_signed_params(extra_params)
-                headers = self._get_headers(authenticated=True)
-                async with session.get(url, params=params, headers=headers) as retry_resp:
-                    result = await retry_resp.json()
-                    err_code = result.get("errCode", -1)
-
+                continue
             if err_code != 0:
                 raise SAJApiError(
                     f"API error on {path}: {result.get('errMsg', 'Unknown')}",
                     err_code=err_code,
                 )
-
             return result.get("data", {})
+
+    async def _api_v2_post(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Read a v2 endpoint and renew an expired session at most once."""
+        await self._ensure_authenticated()
+        session = await self._ensure_session()
+        for attempt in range(2):
+            headers, body = self._build_v2_request(params)
+            async with session.post(
+                f"{self._base_url}{API_V2_PATH}/{path}", data=body.encode("utf-8"),
+                headers=headers, timeout=REQUEST_TIMEOUT,
+            ) as resp:
+                result = {"errCode": 401} if resp.status == 401 else await self._read_response(resp)
+            err_code = result.get("errCode", -1)
+            if err_code in AUTH_EXPIRED_CODES and attempt == 0:
+                self._token = None
+                await self.login()
+                continue
+            if err_code != 0:
+                raise SAJApiError(
+                    f"API error on {path}: {result.get('errMsg', 'Unknown')}",
+                    err_code=err_code,
+                )
+            data = result.get("data")
+            if not isinstance(data, dict):
+                raise SAJApiError(f"Unexpected data format on {path}")
+            return data
 
     async def _api_post(
         self, path: str, body: dict[str, Any] | None = None
@@ -345,20 +440,31 @@ class SAJApi:
         return data.get("list", []) if isinstance(data, dict) else data
 
     async def get_plant_overview(self, plant_uid: str) -> dict[str, Any]:
-        """Get aggregated overview data for a plant."""
-        return await self._api_get("monitor/home/getPlantGridOverviewInfo", {
-            "plantUid": plant_uid,
-        })
+        """Map v2 energy statistics to the existing sensor keys (kWh, W)."""
+        data = await self.get_plant_statistics(plant_uid)
+        rows = data.get("energyDataList", [])
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise SAJApiError("Unexpected plant energy statistics format")
+        sections = {row.get("dataType"): row for row in rows}
+        energy = sections.get("PV_ENERGY", {})
+        revenue = sections.get("REVENUE", {})
+        return {
+            "todayEnergy": energy.get("energy1Today"),
+            "totalEnergy": energy.get("energy1Total"),
+            "peakPower": data.get("peakPower"),
+            "todayIncome": revenue.get("todayIncome"),
+            "totalIncome": revenue.get("totalIncome"),
+        }
 
     async def get_plant_statistics(self, plant_uid: str) -> dict[str, Any]:
         """Get plant statistics data."""
-        return await self._api_get("monitor/home/getPlantStatisticsData", {
+        return await self._api_v2_post("monitor/plantHome/getPlantEnergyStatistics", {
             "plantUid": plant_uid,
         })
 
     async def get_energy_flow(self, plant_uid: str) -> dict[str, Any]:
         """Get real-time energy flow data for a plant."""
-        return await self._api_get("monitor/home/getDeviceEneryFlowData", {
+        return await self._api_v2_post("monitor/plantHome/getDeviceEnergyFlowDiagram", {
             "plantUid": plant_uid,
         })
 

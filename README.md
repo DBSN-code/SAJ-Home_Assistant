@@ -17,7 +17,7 @@ Integração nativa para monitorar micro inversores **SAJ** via portal [iop.saj-
 | **Por Inversor** | Potência atual (W), Energia hoje/mês/ano/total (kWh), Tensão/Corrente/Frequência da rede, Status, Receita do dia |
 | **Planta (agregado)** | Potência total, Pico de potência, Energia hoje/total, Dispositivos online, Receita hoje/total |
 
-- ⚡ **18 sensores** criados automaticamente (10 por inversor + 8 da planta)
+- ⚡ **10 sensores por inversor + 8 da planta**, criados automaticamente
 - 🔋 Compatível com o **Energy Dashboard** do HA
 - 🌐 Traduções em **Português (BR)** e **Inglês**
 - 🔒 Autenticação segura (AES-ECB + JWT)
@@ -110,10 +110,42 @@ custom_components/saj_iop/
 ### API
 
 A integração se comunica diretamente com a API REST do portal SAJ:
-- **Autenticação:** Senha encriptada com AES-ECB + JWT Bearer Token
-- **Assinatura:** SHA1(MD5(params + secret_key))
-- **Endpoints:** Login, Plant List, Device List, Device Info, Energy Flow
+- **Autenticação:** Login v2, senha encriptada com AES-ECB e token Bearer.
+- **API v2:** Login, estatísticas de energia da planta e fluxo de potência usam JSON com assinatura `X-Sign` (HMAC-SHA256 sobre os metadados e o MD5 do corpo enviado).
+- **API v1:** Lista de plantas, lista de dispositivos e detalhes dos inversores mantêm as rotas compatíveis e a assinatura SHA1/MD5 anterior.
+- **Sessão:** Uma tentativa de renovação quando a SAJ informa sessão expirada; requisições limitadas a 30 segundos.
 - **Polling:** A cada 5 minutos (configurável)
+
+### Compatibilidade com o portal atual (0.1.1)
+
+O portal SAJ passou a usar `/dev-api/api/v2/sys/user/login`. O login antigo
+retornava `10002 / Please login first`; as antigas rotas de resumo e fluxo da
+planta retornavam texto indicando interface indisponível. A versão 0.1.1 usa
+o protocolo atual nesses pontos e preserva os identificadores das entidades,
+as unidades e os históricos existentes.
+
+As seções `PV_ENERGY` e `REVENUE` de `getPlantEnergyStatistics` fornecem energia
+em kWh e receita; `getDeviceEnergyFlowDiagram.totalPvPower` fornece potência em W.
+Os contadores consideram os dispositivos devolvidos pela SAJ, inclusive registros
+antigos offline, e os estados normal/alarme contam como online. Leituras ausentes
+ficam desconhecidas, em vez de gerar zeros artificiais no histórico.
+
+Atualize os arquivos da integração e reinicie o Home Assistant para carregar o
+código Python novo. Não é necessário excluir ou cadastrar novamente a integração.
+
+### Testes
+
+Com `aiohttp` e `pycryptodome` instalados:
+
+```bash
+python -m unittest discover -s tests -p test_api.py -v
+```
+
+Para testar também o coordenador e os contratos das entidades, execute
+`python -m unittest discover -s tests -v` em um ambiente com as dependências do
+Home Assistant instaladas. Os testes não acessam contas reais nem alteram uma
+instância em execução. A assinatura tem um vetor de referência calculado
+separadamente com o módulo `crypto` do Node.js.
 
 ---
 
